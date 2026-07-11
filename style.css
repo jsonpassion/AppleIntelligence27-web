@@ -160,7 +160,7 @@ figcaption {
 }
 .stat-card .num { font-size: 34px; font-weight: 850; letter-spacing: -0.03em; color: var(--accent); line-height: 1.1; }
 .stat-card .num small { font-size: 19px; font-weight: 750; }
-.stat-card .label { font-size: 13.5px; color: var(--text-2); line-height: 1.55; flex: 1; }
+.stat-card .label { font-size: 13.5px; color: var(--text-2); line-height: 1.55; flex: 1; overflow-wrap: anywhere; }
 .stat-card .src { font-size: 11.5px; color: var(--text-3); }
 
 /* ─── TOC ─── */
@@ -188,7 +188,7 @@ figcaption {
 
 /* ─── Chapter prose ─── */
 .chapter { border-top: 1px solid var(--border); }
-.prose { max-width: 760px; }
+.prose { max-width: 760px; overflow-wrap: break-word; }
 .prose p { margin-bottom: 18px; color: var(--text-2); }
 .prose p strong, .prose li strong { color: var(--text); }
 .prose h3 {
@@ -202,7 +202,10 @@ code {
   font-family: "SF Mono", ui-monospace, Menlo, monospace;
   font-size: 0.86em; background: var(--bg-code);
   border: 1px solid var(--border); border-radius: 5px; padding: 1px 5px;
+  /* PrivateCloudComputeLanguageModel 같은 장문 식별자가 프레임을 넘지 않게 줄바꿈 허용 */
+  overflow-wrap: anywhere;
 }
+pre code { overflow-wrap: normal; }
 
 .prose pre {
   background: var(--bg-code); border: 1px solid var(--border);
