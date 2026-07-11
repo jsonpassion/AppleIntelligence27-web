@@ -171,6 +171,12 @@
       </table>
     </div>
     <h3>Instruction-Following Pruning — 20B를 폰에 넣는 방법</h3>
+    <figure class="lottie-fig">
+      <div class="lottie-box" role="img"
+           aria-label="NAND 그리드에서 프롬프트가 도착하면 선택된 expert 세 개만 DRAM 카드의 슬롯으로 이동했다가 되돌아가는 애니메이션. 카드 안의 shared expert는 항상 켜져 있다"
+           data-lottie="assets/lottie/ifp-experts.json" data-still="200"></div>
+      <figcaption>그림 2 — IFP: 전체 가중치는 NAND에, 프롬프트별로 선택된 routed expert만 DRAM으로. 녹색 shared expert는 항상 활성</figcaption>
+    </figure>
     <p>
       AFM 3 Core Advanced의 핵심은 <strong>전체 가중치를 RAM에 올리지 않는다</strong>는 점입니다.
       모델 전체는 NAND 플래시에 저장해 두고, 프롬프트 초기 처리 단계에서 <strong>경량 dense 블록</strong>이
@@ -284,7 +290,7 @@
       <div class="lottie-box" role="img"
            aria-label="기기에서 클라우드로 요청 펄스가 이동하고 자물쇠가 잠긴 뒤 초록 응답 펄스가 돌아오는 애니메이션"
            data-lottie="assets/lottie/pcc-privacy.json" data-still="200"></div>
-      <figcaption>그림 2 — PCC 요청 흐름: 프롬프트는 저장되지 않고, 보안 속성은 외부 감사로 검증 가능하다</figcaption>
+      <figcaption>그림 3 — PCC 요청 흐름: 프롬프트는 저장되지 않고, 보안 속성은 외부 감사로 검증 가능하다</figcaption>
     </figure>
     <p>
       지금까지 서버급 LLM을 앱에 넣으려면 프로바이더 계정, API 키 관리, 과금 설정, 프록시 서버가 필요했습니다.
@@ -328,6 +334,12 @@
     <p>프롬프트에 이미지를 첨부한다<a class="fn" href="#ref-2">[2]</a></p>
   </div>
   <div class="prose reveal">
+    <figure class="lottie-fig">
+      <div class="lottie-box" role="img"
+           aria-label="사진 썸네일이 프롬프트 바에 첨부되어 함께 모델 칩으로 들어가고, 모델이 텍스트 답변 버블을 생성하는 애니메이션"
+           data-lottie="assets/lottie/vision-attach.json" data-still="120"></div>
+      <figcaption>그림 4 — 멀티모달 프롬프트: 사진이 Attachment로 프롬프트에 실려 온디바이스 모델로 들어가고, 답변이 돌아온다</figcaption>
+    </figure>
     <p>
       온디바이스 모델이 이미지를 이해합니다. 프롬프트 빌더 안에 <code>Attachment</code>로 이미지를 넣으면 되고,
       받는 타입은 사실상 전부입니다 — <code>UIImage</code>, <code>NSImage</code>, <code>CGImage</code>,
@@ -363,7 +375,7 @@
       <div class="lottie-box" role="img"
            aria-label="세션 카드 안의 지시문 바와 도구 칩, 모델 배지가 온디바이스 상태와 클라우드 상태를 오가며 교체되는 애니메이션"
            data-lottie="assets/lottie/profile-switch.json" data-still="120"></div>
-      <figcaption>그림 3 — Dynamic Profiles: 분석 단계(온디바이스·파랑)와 브레인스토밍 단계(PCC·보라)가 한 세션에서 교대한다</figcaption>
+      <figcaption>그림 5 — Dynamic Profiles: 분석 단계(온디바이스·파랑)와 브레인스토밍 단계(PCC·보라)가 한 세션에서 교대한다</figcaption>
     </figure>
     <h3>Dynamic Profiles</h3>
     <p>
@@ -454,6 +466,12 @@
 }</code></pre>
 
     <h3>트랜스크립트 관리 — 세 개의 층</h3>
+    <figure class="lottie-fig">
+      <div class="lottie-box" role="img"
+           aria-label="대화 말풍선들이 쌓이다가 오래된 네 개가 하나의 보라색 요약 블록으로 압축되고, 최근 항목들이 위로 올라오며 새 말풍선이 추가되는 애니메이션"
+           data-lottie="assets/lottie/context-compaction.json" data-still="210"></div>
+      <figcaption>그림 6 — 압축(compaction): 오래된 이력이 요약 블록으로 접히고, 최근 항목과 새 대화만 원문으로 남는다</figcaption>
+    </figure>
     <div class="table-wrap">
       <table>
         <thead><tr><th>층</th><th>API</th><th>성격</th><th>용도</th></tr></thead>
