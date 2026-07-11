@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Apple Intelligence 27 — 3세대 Apple Foundation Models 기술 리포트</title>
+<meta name="description" content="WWDC26에서 발표된 3세대 Apple Foundation Models와 iOS 27 / macOS 27 Apple Intelligence 개발자 기술을 출처와 함께 정리한 비공식 기술 리포트. 모델 아키텍처, LanguageModel 프로토콜, Private Cloud Compute, Dynamic Profiles, Core AI, Evaluations까지.">
+<meta property="og:title" content="Apple Intelligence 27 — 3세대 AFM 기술 리포트">
+<meta property="og:description" content="무엇이 새로 왔고, 무엇이 강해졌나 — WWDC26 세션과 공식 문서 기반 상세 정리">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-inner">
+    <a href="#top" class="nav-brand">🧠 AppleIntelligence<span class="accent">27</span></a>
+    <div class="nav-links">
+      <a href="#stats">한눈에</a>
+      <a href="#toc">목차</a>
+      <a href="#ch-models">모델</a>
+      <a href="#ch-protocol">프레임워크</a>
+      <a href="#ch-agentic">에이전틱</a>
+      <a href="#ch-checklist">체크리스트</a>
+      <a href="#references">참고 자료</a>
+    </div>
+    <button id="themeToggle" class="theme-toggle" aria-label="테마 전환">◐</button>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="hero-kicker">
+    <span class="chip chip-accent">WWDC26</span>
+    <span class="chip">2026. 6. 8 발표</span>
+    <span class="chip">iOS · macOS · watchOS · visionOS 27 베타</span>
+    <span class="chip chip-warn">정식 릴리스 2026. 9 예정</span>
+  </div>
+  <h1>3세대 Apple Foundation Models<br><span class="gradient-text">기술 리포트</span></h1>
+  <p class="hero-sub">
+    Foundation Models 프레임워크가 "Apple 모델 전용 API"에서 <strong>모든 LLM을 위한 공용 Swift 인터페이스</strong>로
+    확장됐습니다. 이 문서는 WWDC26 세션·공식 문서·테크 리포트를 근거로, OS 27 세대에서
+    <strong>무엇이 새로 생겼고 무엇이 강화되었는지</strong>를 개발자 관점에서 상세히 정리한 비공식 기술 리포트입니다.
+  </p>
+  <figure class="lottie-fig reveal">
+    <div class="lottie-box lottie-hero" role="img"
+         aria-label="다섯 개의 모델 칩이 흩어져 있다가 하나의 LanguageModelSession 카드로 부드럽게 합쳐지는 애니메이션"
+         data-lottie="assets/lottie/hero-abstraction.json" data-still="220"></div>
+    <figcaption>그림 1 — 하나의 세션, 다섯 갈래의 백엔드: 온디바이스 · PCC · Claude · Gemini · MLX가 같은 API로 수렴한다</figcaption>
+  </figure>
+  <div class="hero-meta">
+    <span class="chip"><strong>11</strong>개 챕터</span>
+    <span class="chip"><strong>19</strong>개 참고 자료</span>
+    <span class="chip"><strong>18</strong>개 WWDC26 세션 링크</span>
+    <span class="chip chip-soft">비공식 개인 정리</span>
+  </div>
+</header>
+
+<main>
+
+<!-- ═══════════════ 한눈에: 숫자 ═══════════════ -->
+<section id="stats" class="section">
+  <div class="sec-head reveal">
+    <span class="sec-tag">NUMBERS</span>
+    <h2>여덟 개의 숫자로 보는 AFM 3</h2>
+    <p>발표에서 인용된 수치 중 이번 세대의 방향을 실제로 보여주는 것만 골랐습니다.</p>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-card reveal"><div class="num">45.6<small>%</small></div>
+      <div class="label">AFM 3 Core(온디바이스 3B)가 텍스트 태스크에서 2025년 모델 대비 받은 <strong>선호도 우위</strong></div>
+      <span class="src">Apple ML Research<a class="fn" href="#ref-1">[1]</a></span></div>
+    <div class="stat-card reveal"><div class="num">20B <small>→ 1–4B</small></div>
+      <div class="label">AFM 3 Core Advanced의 전체 파라미터와 요청당 <strong>실제 활성</strong> 파라미터 — sparse activation</div>
+      <span class="src">Apple ML Research<a class="fn" href="#ref-1">[1]</a></span></div>
+    <div class="stat-card reveal"><div class="num">64.7 <small>: 8.7</small></div>
+      <div class="label">AFM 3 Cloud와 전 세대 서버 모델의 <strong>맞대결 선호도</strong> — 사실상 세대 교체</div>
+      <span class="src">Apple ML Research<a class="fn" href="#ref-1">[1]</a></span></div>
+    <div class="stat-card reveal"><div class="num">32K</div>
+      <div class="label">PrivateCloudComputeLanguageModel의 <strong>컨텍스트 윈도</strong> — API 키 없이 사용</div>
+      <span class="src">WWDC26 · 241<a class="fn" href="#ref-2">[2]</a></span></div>
+    <div class="stat-card reveal"><div class="num">200<small>만</small></div>
+      <div class="label">첫 다운로드 기준 — 이 미만이면 <strong>PCC 서버 모델이 무료</strong> (스몰 비즈니스 프로그램)</div>
+      <span class="src">WWDC26 · 241 · Newsroom<a class="fn" href="#ref-2">[2]</a><a class="fn" href="#ref-8">[8]</a></span></div>
+    <div class="stat-card reveal"><div class="num">+37.8<small>%</small></div>
+      <div class="label">이미지 이해 태스크에서의 <strong>인간 선호도 개선</strong> — 온디바이스 멀티모달의 근거</div>
+      <span class="src">Apple ML Research<a class="fn" href="#ref-1">[1]</a></span></div>
+    <div class="stat-card reveal"><div class="num">4.15<small> MOS</small></div>
+      <div class="label">표현력 TTS의 평균 의견 점수 — 기존 3.87에서 <strong>자연스러움 대폭 향상</strong></div>
+      <span class="src">Apple ML Research<a class="fn" href="#ref-1">[1]</a></span></div>
+    <div class="stat-card reveal"><div class="num">14<small>%</small></div>
+      <div class="label">AFM 3 Cloud Pro의 <strong>수학·복잡 추론 개선폭</strong> (AFM 3 Cloud 대비)</div>
+      <span class="src">Apple ML Research<a class="fn" href="#ref-1">[1]</a></span></div>
+  </div>
+</section>
+
+<!-- ═══════════════ 목차 ═══════════════ -->
+<section id="toc" class="section">
+  <div class="sec-head reveal">
+    <span class="sec-tag">CONTENTS</span>
+    <h2>목차</h2>
+  </div>
+  <ol class="toc reveal">
+    <li><a href="#ch-overview">개요 — 이번 세대가 바꾸는 것</a></li>
+    <li><a href="#ch-models">모델 라인업과 아키텍처</a></li>
+    <li><a href="#ch-protocol">LanguageModel 프로토콜 — 모델 추상화 레이어 <em>신규</em></a></li>
+    <li><a href="#ch-pcc">Private Cloud Compute 개발자 개방 <em>신규</em></a></li>
+    <li><a href="#ch-vision">Vision — 온디바이스 멀티모달 입력 <em>신규</em></a></li>
+    <li><a href="#ch-agentic">에이전틱 — Dynamic Profiles와 시스템 도구 <em>신규</em></a></li>
+    <li><a href="#ch-coreai">Core AI 프레임워크 <em>신규</em></a></li>
+    <li><a href="#ch-eval">Evaluations 프레임워크 <em>신규</em></a></li>
+    <li><a href="#ch-tooling">도구와 생태계 — fm CLI · Python SDK · Xcode 27 · 오픈소스</a></li>
+    <li><a href="#ch-system">시스템 통합 강화 — Siri · App Intents · 이미지 · 음성 <em>강화</em></a></li>
+    <li><a href="#ch-checklist">개발자 체크리스트와 샘플 앱</a></li>
+  </ol>
+</section>
+
+<!-- ═══════════════ §1 개요 ═══════════════ -->
+<article id="ch-overview" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§1</span>
+    <h2>개요 — 이번 세대가 바꾸는 것</h2>
+  </div>
+  <div class="prose reveal">
+    <p>
+      2025년의 Foundation Models 프레임워크가 "온디바이스 Apple 모델을 세 줄의 Swift로 호출한다"는 증명이었다면,
+      2026년 6월 8일 발표된 3세대는 그 API를 <strong>플랫폼</strong>으로 확장합니다<a class="fn" href="#ref-1">[1]</a><a class="fn" href="#ref-2">[2]</a>.
+      핵심 변화는 세 가지입니다.
+    </p>
+    <p>
+      첫째, <strong>모델이 교체 가능한 부품이 됐습니다.</strong> 새 <code>LanguageModel</code> 프로토콜 아래에서
+      온디바이스 모델, Apple 서버 모델(PCC), Anthropic Claude, Google Gemini, 로컬 오픈소스 모델(Core AI · MLX)이
+      전부 같은 <code>LanguageModelSession</code>으로 호출됩니다. 세션 코드는 그대로 두고 모델만 갈아 끼울 수 있습니다<a class="fn" href="#ref-2">[2]</a><a class="fn" href="#ref-5">[5]</a><a class="fn" href="#ref-11">[11]</a>.
+    </p>
+    <p>
+      둘째, <strong>Apple 서버 모델이 개발자에게 열렸습니다.</strong> 계정도, API 키도, 과금 설정도 없이
+      <code>PrivateCloudComputeLanguageModel()</code> 한 줄로 32K 컨텍스트 서버 모델을 호출하고,
+      첫 다운로드 200만 미만 앱은 무료입니다<a class="fn" href="#ref-2">[2]</a><a class="fn" href="#ref-4">[4]</a><a class="fn" href="#ref-8">[8]</a>.
+    </p>
+    <p>
+      셋째, <strong>에이전틱 앱이 1급 시민이 됐습니다.</strong> 상태에 따라 지시문·도구·모델을 선언적으로 교체하는
+      Dynamic Profiles, Vision 기반 내장 도구(OCR·바코드), Spotlight 시맨틱 인덱스를 이용한 완전 로컬 RAG,
+      품질을 정량 측정하는 Evaluations 프레임워크, 에이전트 전용 Instruments까지 —
+      설계·구현·디버깅·평가의 전 과정을 커버하는 도구가 한 세대에 모두 나왔습니다<a class="fn" href="#ref-2">[2]</a><a class="fn" href="#ref-3">[3]</a><a class="fn" href="#ref-7">[7]</a><a class="fn" href="#ref-15">[15]</a>.
+    </p>
+    <div class="callout">
+      <strong>시점 주의</strong> — 이 문서는 2026년 7월 12일, OS 27 <em>베타</em> 기준으로 작성됐습니다.
+      정식 릴리스(2026년 9월 예정) 전까지 API 시그니처와 정책 수치는 변경될 수 있습니다.
+    </div>
+  </div>
+</article>
+
+<!-- ═══════════════ §2 모델 ═══════════════ -->
+<article id="ch-models" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§2</span>
+    <h2>모델 라인업과 아키텍처</h2>
+    <p>AFM 3 — Google과 협업해 커스텀 빌드된 5개 모델<a class="fn" href="#ref-1">[1]</a><a class="fn" href="#ref-8">[8]</a></p>
+  </div>
+  <div class="prose reveal">
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>모델</th><th>실행 위치</th><th>규모 · 구조</th><th>역할</th></tr></thead>
+        <tbody>
+          <tr><td><strong>AFM 3 Core</strong></td><td>온디바이스</td><td>3B · dense</td><td>기본 온디바이스 모델. 텍스트 태스크 선호도 45.6% 우위(2025 대비). 추론·툴 콜링 재설계</td></tr>
+          <tr><td><strong>AFM 3 Core Advanced</strong></td><td>온디바이스</td><td>20B · 네이티브 멀티모달 · sparse (요청당 1–4B 활성)</td><td>고성능 온디바이스. Instruction-Following Pruning으로 RAM 상주 없이 20B급 품질</td></tr>
+          <tr><td><strong>AFM 3 Cloud</strong></td><td>PCC</td><td>Parallel-Track MoE 개선</td><td>속도·효율 최적화 서버 모델. 선호도 64.7% : 8.7%로 전 세대 압도</td></tr>
+          <tr><td><strong>ADM 3 Cloud (Image)</strong></td><td>PCC</td><td>디퓨전 (이미지 전용)</td><td>Image Playground의 고품질 생성·편집 담당</td></tr>
+          <tr><td><strong>AFM 3 Cloud Pro</strong></td><td>PCC</td><td>최상위 · 에이전틱</td><td>복잡한 추론·에이전틱 툴 사용. 수학 추론 +14%. NVIDIA GPU(Google Cloud) 구동, PCC 보증 동일</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <h3>Instruction-Following Pruning — 20B를 폰에 넣는 방법</h3>
+    <p>
+      AFM 3 Core Advanced의 핵심은 <strong>전체 가중치를 RAM에 올리지 않는다</strong>는 점입니다.
+      모델 전체는 플래시 스토리지에 두고, 프롬프트가 들어오면 <em>라우팅 결정</em>을 먼저 내려
+      해당 요청에 필요한 <strong>routed expert</strong>만 선택적으로 로드합니다. 항상 활성 상태인
+      <strong>shared expert</strong>가 일관성을 담보하고, 요청당 실제 연산은 1–4B 파라미터 수준으로 유지됩니다<a class="fn" href="#ref-1">[1]</a>.
+      결과적으로 "20B급 품질, 3B급 메모리 발자국"이 온디바이스에서 성립합니다.
+    </p>
+    <h3>서버 쪽 — Parallel-Track MoE</h3>
+    <p>
+      AFM 3 Cloud는 2세대에서 도입된 Parallel-Track Mixture-of-Experts를 개선해
+      멀티모달 추론과 긴 컨텍스트 리콜을 강화했습니다. 오디오 이해가 모델 전반에 통합됐고,
+      이미지 이해는 인간 선호도 기준 +37.8% 개선됐습니다<a class="fn" href="#ref-1">[1]</a>.
+      전체 만족도는 전 세대 대비 상대 기준 36% 향상입니다<a class="fn" href="#ref-1">[1]</a>.
+    </p>
+    <div class="callout callout-info">
+      <strong>훈련 데이터와 프라이버시</strong> — 공개 정보, 라이선스·구매 데이터, 오픈소스 데이터 혼합으로 훈련되었으며,
+      Apple은 "사용자 데이터는 훈련에 저장되지도, Apple을 포함한 누구와도 공유되지 않는다"고 명시합니다<a class="fn" href="#ref-1">[1]</a>.
+    </div>
+  </div>
+</article>
+
+<!-- ═══════════════ §3 LanguageModel 프로토콜 ═══════════════ -->
+<article id="ch-protocol" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§3 · 신규</span>
+    <h2>LanguageModel 프로토콜 — 모델 추상화 레이어</h2>
+    <p>이번 세대의 가장 큰 구조 변화<a class="fn" href="#ref-2">[2]</a><a class="fn" href="#ref-5">[5]</a><a class="fn" href="#ref-11">[11]</a></p>
+  </div>
+  <div class="prose reveal">
+    <p>
+      <code>LanguageModelSession</code>의 백엔드가 공개 프로토콜로 열렸습니다.
+      기본 제공 구현은 네 가지 — <code>SystemLanguageModel</code>(온디바이스),
+      <code>PrivateCloudComputeLanguageModel</code>(Apple 서버), <code>CoreAILanguageModel</code>(로컬 패키징 모델),
+      <code>MLXLanguageModel</code>(HuggingFace MLX 포맷, Neural Engine/GPU 구동) — 이고,
+      Anthropic과 Google이 런치 파트너로 각자 Swift 패키지를 배포합니다<a class="fn" href="#ref-2">[2]</a>.
+    </p>
+    <pre><code><span class="c">// 어떤 모델이든 세션 코드는 동일하다</span>
+<span class="k">let</span> model = <span class="t">SystemLanguageModel</span>()               <span class="c">// 온디바이스</span>
+<span class="c">// let model = PrivateCloudComputeLanguageModel() // Apple 서버</span>
+<span class="c">// let model = AnthropicLanguageModel(apiKey: t)  // Claude (파트너 패키지)</span>
+
+<span class="k">let</span> session = <span class="t">LanguageModelSession</span>(model: model)
+<span class="k">let</span> response = <span class="k">try await</span> session.<span class="nf">respond</span>(to: <span class="s">"이 계약서를 요약해줘."</span>)</code></pre>
+    <h3>프로바이더를 직접 만든다면</h3>
+    <p>
+      커스텀 프로바이더는 두 프로토콜을 구현합니다. <code>LanguageModel</code>이 <strong>능력 선언</strong>
+      (툴 콜링·guided generation·reasoning 지원 여부)과 설정을 맡고,
+      <code>LanguageModelExecutor</code>가 <strong>실제 생성과 와이어 포맷 변환</strong>을 맡습니다<a class="fn" href="#ref-11">[11]</a>.
+    </p>
+    <pre><code><span class="k">struct</span> <span class="t">MyLanguageModel</span>: <span class="t">LanguageModel</span> {
+    <span class="k">typealias</span> Executor = <span class="t">MyLanguageModelExecutor</span>
+
+    <span class="k">var</span> capabilities: <span class="t">LanguageModelCapabilities</span> {
+        <span class="t">LanguageModelCapabilities</span>(capabilities: [.toolCalling, .guidedGeneration, .reasoning])
+    }
+    <span class="k">var</span> executorConfiguration: Executor.Configuration {
+        Executor.<span class="t">Configuration</span>(<span class="c">/* 엔드포인트 · 인증 · 모델 변형 */</span>)
+    }
+}
+
+<span class="k">struct</span> <span class="t">MyLanguageModelExecutor</span>: <span class="t">LanguageModelExecutor</span> {
+    <span class="k">func</span> <span class="nf">respond</span>(
+        to request: <span class="t">LanguageModelExecutorGenerationRequest</span>,
+        model: <span class="t">MyLanguageModel</span>,
+        streamingInto channel: <span class="t">LanguageModelExecutorGenerationChannel</span>
+    ) <span class="k">async throws</span> {
+        <span class="c">// 대화 이력은 타입 있는 Transcript로 도착:</span>
+        <span class="c">// .instructions / .prompt / .toolCalls / .toolOutput / .response</span>
+        <span class="k">await</span> channel.send(.response(action: .updateMetadata([<span class="s">"modelID"</span>: <span class="s">"my-model-2026"</span>])))
+        <span class="k">await</span> channel.send(.response(action: .appendText(token)))   <span class="c">// 텍스트 델타</span>
+        <span class="k">await</span> channel.send(.response(action: .updateUsage(<span class="c">/* 토큰 집계 */</span>)))
+    }
+}</code></pre>
+    <p>
+      프레임워크는 <code>contextSizeExceeded</code> · <code>rateLimited</code> · <code>refusal</code> ·
+      <code>guardrailViolation</code> · <code>timeout</code> 등 <strong>타입 있는 공용 에러</strong>를 정의해
+      어떤 프로바이더를 쓰든 오류 처리가 통일됩니다. 텍스트가 아닌 출력(인용, 검색 청크, 오디오 등)은
+      <code>Transcript.CustomSegment</code>로 타입을 유지한 채 트랜스크립트에 남길 수 있습니다<a class="fn" href="#ref-11">[11]</a>.
+    </p>
+    <div class="callout">
+      <strong>API 키는 바이너리에 넣지 말 것</strong> — 파트너 모델 인증은 OAuth + 키체인 조합이 권장 패턴입니다<a class="fn" href="#ref-2">[2]</a>.
+    </div>
+    <h3>토큰 사용량 추적 — response.usage</h3>
+    <p>
+      서드파티 모델이 세션에 들어오면서 비용 추적이 필수가 됐습니다. 응답마다
+      <code>usage</code> 프로퍼티로 입력·캐시·출력·추론 토큰을 확인합니다<a class="fn" href="#ref-2">[2]</a>.
+    </p>
+    <pre><code><span class="nf">print</span>(response.usage.input.totalTokenCount)      <span class="c">// 입력</span>
+<span class="nf">print</span>(response.usage.input.cachedTokenCount)     <span class="c">// 그중 캐시 적중</span>
+<span class="nf">print</span>(response.usage.output.totalTokenCount)     <span class="c">// 출력</span>
+<span class="nf">print</span>(response.usage.output.reasoningTokenCount) <span class="c">// 그중 추론에 쓴 토큰</span></code></pre>
+  </div>
+</article>
+
+<!-- ═══════════════ §4 PCC ═══════════════ -->
+<article id="ch-pcc" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§4 · 신규</span>
+    <h2>Private Cloud Compute 개발자 개방</h2>
+    <p>계정 없음 · 키 없음 · 프롬프트 저장 없음<a class="fn" href="#ref-2">[2]</a><a class="fn" href="#ref-4">[4]</a></p>
+  </div>
+  <div class="prose reveal">
+    <figure class="lottie-fig">
+      <div class="lottie-box" role="img"
+           aria-label="기기에서 클라우드로 요청 펄스가 이동하고 자물쇠가 잠긴 뒤 초록 응답 펄스가 돌아오는 애니메이션"
+           data-lottie="assets/lottie/pcc-privacy.json" data-still="200"></div>
+      <figcaption>그림 2 — PCC 요청 흐름: 프롬프트는 저장되지 않고, 보안 속성은 외부 감사로 검증 가능하다</figcaption>
+    </figure>
+    <p>
+      지금까지 서버급 LLM을 앱에 넣으려면 프로바이더 계정, API 키 관리, 과금 설정, 프록시 서버가 필요했습니다.
+      iOS 27에서는 <code>PrivateCloudComputeLanguageModel()</code> 생성자 하나로 끝납니다.
+      인증도 설정도 없습니다 — 기기가 PCC와 직접 신뢰를 협상합니다<a class="fn" href="#ref-4">[4]</a>.
+    </p>
+    <pre><code><span class="k">let</span> model = <span class="t">PrivateCloudComputeLanguageModel</span>()
+<span class="k">let</span> session = <span class="t">LanguageModelSession</span>(model: model)
+
+<span class="k">let</span> response = <span class="k">try await</span> session.<span class="nf">respond</span>(
+    to: <span class="s">"가위가 필요 없는 공예를 추천해줘."</span>,
+    contextOptions: <span class="t">ContextOptions</span>(reasoningLevel: .light)   <span class="c">// .light / .deep</span>
+)</code></pre>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>항목</th><th>내용</th></tr></thead>
+        <tbody>
+          <tr><td>컨텍스트 윈도</td><td>32,000 토큰</td></tr>
+          <tr><td>추론 레벨</td><td><code>.light</code>(빠름) · <code>.deep</code>(품질 우선, 응답 전 사고)</td></tr>
+          <tr><td>무료 조건</td><td>첫 다운로드 200만 미만 (App Store 스몰 비즈니스 프로그램)</td></tr>
+          <tr><td>한도 상향</td><td>iCloud+ 구독 사용자에게 더 높은 한도</td></tr>
+          <tr><td>플랫폼</td><td>watchOS 27 포함 — 손목에서도 서버 모델</td></tr>
+          <tr><td>프라이버시</td><td>프롬프트 미저장 · 독립(외부) 검증 가능</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      <strong>왜 중요한가</strong> — 온디바이스 3B로 부족한 순간(긴 문서, 복잡한 계획 수립, 깊은 추론)마다
+      지금까지는 "서드파티 API 계약"이라는 절벽이 있었습니다. PCC 개방은 그 절벽을 없애고,
+      온디바이스 → PCC → (필요하면) 파트너 모델로 이어지는 <strong>연속적인 성능 사다리</strong>를 만듭니다.
+      Dynamic Profiles(§6)와 결합하면 단계별로 다른 모델을 쓰는 하이브리드 설계가 세션 하나 안에서 가능합니다.
+    </p>
+  </div>
+</article>
+
+<!-- ═══════════════ §5 Vision ═══════════════ -->
+<article id="ch-vision" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§5 · 신규</span>
+    <h2>Vision — 온디바이스 멀티모달 입력</h2>
+    <p>프롬프트에 이미지를 첨부한다<a class="fn" href="#ref-2">[2]</a></p>
+  </div>
+  <div class="prose reveal">
+    <p>
+      온디바이스 모델이 이미지를 이해합니다. 프롬프트 빌더 안에 <code>Attachment</code>로 이미지를 넣으면 되고,
+      받는 타입은 사실상 전부입니다 — <code>UIImage</code>, <code>NSImage</code>, <code>CGImage</code>,
+      Core Image(<code>CIImage</code>), CoreVideo 픽셀 버퍼, 파일 URL. 크기 제한도 없습니다.
+      단, <strong>이미지가 클수록 토큰을 많이 소모</strong>하므로 contextSize 예산 안에서 관리해야 합니다<a class="fn" href="#ref-2">[2]</a>.
+    </p>
+    <pre><code><span class="k">let</span> response = <span class="k">try await</span> session.respond {
+    <span class="s">"이 동물은 무엇인가요?"</span>
+    <span class="t">Attachment</span>(uiImage)
+}</code></pre>
+    <p>
+      2025년까지 이미지 → 텍스트 파이프라인은 Vision 프레임워크(분류·OCR)와 LLM을 개발자가 직접 이어 붙여야 했습니다.
+      이제 "사진을 주고 자연어로 묻는" 흐름이 프레임워크 한 층에서 끝납니다.
+      영수증 정리, 사진 기반 검색, 스크린샷 요약 같은 기능의 구현 비용이 급감합니다.
+    </p>
+    <div class="callout callout-info">
+      <strong>컨텍스트 관리 짝꿍 API</strong> — <code>model.contextSize</code>로 윈도 크기를 확인하고
+      <code>tokenCount(for:)</code>로 프롬프트 비용을 사전 계산할 수 있습니다(26.4 도입).
+      이미지 첨부와 함께 쓰면 "이 사진을 넣어도 되는가"를 보낼 필요 없이 판단할 수 있습니다<a class="fn" href="#ref-2">[2]</a>.
+    </div>
+  </div>
+</article>
+
+<!-- ═══════════════ §6 에이전틱 ═══════════════ -->
+<article id="ch-agentic" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§6 · 신규</span>
+    <h2>에이전틱 — Dynamic Profiles와 시스템 도구</h2>
+    <p>세션 하나 안에서 지시문·도구·모델을 교체한다<a class="fn" href="#ref-2">[2]</a><a class="fn" href="#ref-3">[3]</a></p>
+  </div>
+  <div class="prose reveal">
+    <figure class="lottie-fig">
+      <div class="lottie-box" role="img"
+           aria-label="세션 카드 안의 지시문 바와 도구 칩, 모델 배지가 온디바이스 상태와 클라우드 상태를 오가며 교체되는 애니메이션"
+           data-lottie="assets/lottie/profile-switch.json" data-still="120"></div>
+      <figcaption>그림 3 — Dynamic Profiles: 분석 단계(온디바이스·파랑)와 브레인스토밍 단계(PCC·보라)가 한 세션에서 교대한다</figcaption>
+    </figure>
+    <h3>Dynamic Profiles</h3>
+    <p>
+      에이전트는 단계마다 다른 지시문과 도구가 필요합니다. 지금까지는 세션을 새로 만들거나
+      모든 도구를 한꺼번에 등록하는 수밖에 없었죠. Dynamic Profiles는 SwiftUI처럼
+      <strong>상태에 따라 <code>body</code>를 다시 선언</strong>하는 방식으로 이 문제를 풉니다 —
+      대화 맥락은 유지한 채, 프로필만 바뀝니다<a class="fn" href="#ref-2">[2]</a>.
+    </p>
+    <pre><code><span class="k">struct</span> <span class="t">CraftProfile</span>: <span class="t">LanguageModelSession.DynamicProfile</span> {
+    <span class="k">let</span> states: <span class="t">CraftProjectStates</span>
+
+    <span class="k">var</span> body: <span class="k">some</span> <span class="t">DynamicProfile</span> {
+        <span class="k">switch</span> states.mode {
+        <span class="k">case</span> .craftAnalysis:
+            <span class="t">Profile</span> {
+                <span class="t">Instructions</span> { <span class="s">"사진 속 공예 작품을 분석한다."</span> }
+                <span class="t">RecordImageAnalysisTool</span>()
+                <span class="t">SwitchModeTool</span>(states: states)
+            }
+        <span class="k">case</span> .brainstorm:
+            <span class="t">Profile</span> {
+                <span class="t">Instructions</span> { <span class="s">"다음 작품 아이디어를 브레인스토밍한다."</span> }
+                <span class="t">BrainstormRecordTool</span>()
+            }
+            .<span class="nf">model</span>(states.privateCloudCompute)   <span class="c">// 이 단계만 서버 모델</span>
+            .<span class="nf">reasoningLevel</span>(.deep)
+        }
+    }
+}
+
+<span class="k">let</span> session = <span class="t">LanguageModelSession</span>(profile: <span class="t">CraftProfile</span>(states: states))</code></pre>
+    <p>
+      주목할 부분은 <code>.model()</code> 수정자입니다 — <strong>단계별 모델 스위칭</strong>이 선언 한 줄입니다.
+      가벼운 분류·요약은 온디바이스로, 비용이 큰 추론만 PCC나 파트너 모델로 보내는
+      하이브리드 에이전트가 프레임워크 관용구가 됐습니다. 멀티 에이전트 워크플로의 기반도 이 구조입니다<a class="fn" href="#ref-10">[10]</a>.
+    </p>
+    <h3>시스템 도구 — 모델에 바로 꽂는 내장 Tool</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>도구</th><th>기반</th><th>용도</th></tr></thead>
+        <tbody>
+          <tr><td><code>OCRTool</code></td><td>Vision</td><td>이미지에서 구조화 텍스트 추출 — 모델이 필요 시 스스로 호출</td></tr>
+          <tr><td><code>BarcodeReaderTool</code></td><td>Vision</td><td>바코드·QR 판독</td></tr>
+          <tr><td>Spotlight 검색 도구</td><td>Core Spotlight</td><td>시맨틱 인덱스 기반 <strong>완전 로컬 RAG</strong> — 서버 없이 기기 안 데이터 검색·인용</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p>
+      셋 다 "직접 만들 수는 있지만 만들기 귀찮아서 다들 대충 만들던" 도구입니다.
+      특히 Spotlight 도구는 앱 데이터를 시맨틱 인덱스에 넣어두기만 하면(§10) 검색 증강 생성이 공짜로 따라온다는 뜻이라,
+      로컬 지식 기반 앱의 설계가 근본적으로 단순해집니다<a class="fn" href="#ref-2">[2]</a><a class="fn" href="#ref-19">[19]</a>.
+    </p>
+    <div class="callout">
+      <strong>디버깅</strong> — 에이전틱 세션의 도구 호출·프로필 전환·토큰 흐름은 Xcode 27의 전용
+      Instruments로 추적합니다 (세션 243)<a class="fn" href="#ref-15">[15]</a>.
+    </div>
+  </div>
+</article>
+
+<!-- ═══════════════ §7 Core AI ═══════════════ -->
+<article id="ch-coreai" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§7 · 신규</span>
+    <h2>Core AI 프레임워크</h2>
+    <p>커스텀 LLM을 Apple silicon에 배포하는 정식 경로<a class="fn" href="#ref-8">[8]</a><a class="fn" href="#ref-10">[10]</a></p>
+  </div>
+  <div class="prose reveal">
+    <p>
+      Core ML이 "일반 ML 모델의 배포 포맷"이었다면, Core AI는 <strong>풀사이즈 LLM의 온디바이스 구동</strong>을
+      위해 처음부터 설계된 새 프레임워크입니다. Apple silicon의 유니파이드 메모리와 Neural Engine에 최적화되었고,
+      ahead-of-time 컴파일, 전용 Instruments, PyTorch → Apple silicon 변환 Python 도구를 제공합니다.
+      새 Siri의 기반 기술이기도 합니다<a class="fn" href="#ref-8">[8]</a><a class="fn" href="#ref-10">[10]</a>.
+    </p>
+    <p>
+      Foundation Models와의 관계가 핵심입니다: Core AI로 패키징한 모델은 <code>CoreAILanguageModel</code>로
+      감싸 <strong>같은 세션 API에 꽂을 수 있습니다</strong>(§3). 파인튜닝한 자체 모델을 쓰되
+      guided generation·툴 콜링·트랜스크립트 관리는 프레임워크 것을 그대로 얻는 구조입니다.
+      연구용 MLX 모델은 <code>MLXLanguageModel</code>이 같은 역할을 합니다<a class="fn" href="#ref-2">[2]</a>.
+    </p>
+  </div>
+</article>
+
+<!-- ═══════════════ §8 Evaluations ═══════════════ -->
+<article id="ch-eval" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§8 · 신규</span>
+    <h2>Evaluations 프레임워크</h2>
+    <p>AI 기능의 품질을 단위 테스트 너머에서 측정한다<a class="fn" href="#ref-7">[7]</a></p>
+  </div>
+  <div class="prose reveal">
+    <p>
+      LLM 기능은 입력이 비결정적이라 <code>XCTAssertEqual</code>로 지킬 수 없습니다. Evaluations는
+      Apple 플랫폼 최초의 <strong>정식 평가(evals) 프레임워크</strong>로, 시나리오 집합에 대해 프롬프트·프로필 변경이
+      정확도에 미치는 영향을 정량화하고 <strong>통계적 유의성</strong>까지 확인해 줍니다.
+      "프롬프트를 조금 고쳤더니 좋아진 것 같다"를 "정확도 71% → 83%, 유의미"로 바꾸는 도구입니다<a class="fn" href="#ref-7">[7]</a>.
+    </p>
+    <p>
+      세션 335는 이를 "hill-climbing"이라 부릅니다 — 평가 점수를 기준으로 프롬프트를 반복 개선하는 워크플로가
+      Xcode 안에서 돌아갑니다. 에이전틱 앱용 견고한 평가 설계는 세션 299가 다룹니다<a class="fn" href="#ref-7">[7]</a>.
+    </p>
+    <div class="callout callout-info">
+      <strong>왜 지금 나왔나</strong> — 모델 추상화(§3) 때문입니다. 모델을 갈아 끼울 수 있게 되면
+      "갈아 끼워도 품질이 유지되는가"를 측정할 도구가 반드시 필요합니다. Evaluations는 그 답입니다.
+    </div>
+  </div>
+</article>
+
+<!-- ═══════════════ §9 도구·생태계 ═══════════════ -->
+<article id="ch-tooling" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§9</span>
+    <h2>도구와 생태계</h2>
+    <p>fm CLI · Python SDK · Xcode 27 · 오픈소스<a class="fn" href="#ref-6">[6]</a><a class="fn" href="#ref-8">[8]</a><a class="fn" href="#ref-10">[10]</a></p>
+  </div>
+  <div class="prose reveal">
+    <h3>fm CLI (macOS 27)</h3>
+    <p>터미널에서 온디바이스 모델과 PCC를 바로 씁니다. 셸 파이프라인의 부품으로 LLM이 들어옵니다<a class="fn" href="#ref-6">[6]</a>.</p>
+    <pre><code>$ fm chat                                  <span class="c"># 대화형</span>
+$ fm <span class="s">"이 문서를 요약해"</span> &lt; report.md          <span class="c"># 파이프</span>
+$ fm <span class="s">"이 이미지에 어울리는 파일명을 지어줘"</span>   <span class="c"># 스크립트 부품</span></code></pre>
+    <h3>Foundation Models Python SDK</h3>
+    <p>
+      <code>apple_fm_sdk</code> — Swift API와 동형의 Python 인터페이스입니다.
+      ML 파이프라인·노트북·자동화 스크립트에서 Apple 온디바이스 모델을 호출합니다<a class="fn" href="#ref-6">[6]</a>.
+    </p>
+    <pre><code><span class="k">import</span> apple_fm_sdk <span class="k">as</span> fm
+
+model = fm.SystemLanguageModel()
+is_available, reason = model.is_available()
+session = fm.LanguageModelSession(model=model)
+response = <span class="k">await</span> session.respond(prompt=<span class="s">"Hello!"</span>)</code></pre>
+    <h3>Xcode 27</h3>
+    <p>
+      Anthropic·Google·OpenAI의 모델·에이전트가 IDE에 내장됩니다. 에이전트가 시뮬레이터를 조작하고,
+      테스트를 작성·실행하고, 크래시를 수정합니다. MCP(Model Context Protocol) 플러그인 확장,
+      Agent Client Protocol 호환, Device Hub, Apple silicon 전용 30% 경량화가 함께 왔습니다<a class="fn" href="#ref-8">[8]</a><a class="fn" href="#ref-10">[10]</a>.
+    </p>
+    <h3>오픈소스 전환</h3>
+    <p>
+      Foundation Models 프레임워크 <strong>코어가 오픈소스</strong>가 됩니다 — Swift가 도는 곳이면
+      Linux 서버에서도 같은 세션 API로 로컬 LLM을 다룰 수 있습니다. 별도의 Utilities 패키지는
+      트랜스크립트 관리 프로필, 절차적 지식을 위한 Skill API, Chat Completions 호환 인터페이스를 제공하며
+      <strong>OS 릴리스 주기와 무관하게</strong> 업데이트됩니다<a class="fn" href="#ref-2">[2]</a><a class="fn" href="#ref-10">[10]</a>.
+    </p>
+  </div>
+</article>
+
+<!-- ═══════════════ §10 시스템 통합 강화 ═══════════════ -->
+<article id="ch-system" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§10 · 강화</span>
+    <h2>시스템 통합 — Siri · App Intents · 이미지 · 음성</h2>
+    <p>앱을 OS 인텔리전스에 노출하는 통로들<a class="fn" href="#ref-9">[9]</a><a class="fn" href="#ref-14">[14]</a></p>
+  </div>
+  <div class="prose reveal">
+    <h3>App Intents — 새 Siri의 관문</h3>
+    <p>
+      완전히 새로워진 Siri가 앱과 만나는 지점은 여전히 App Intents입니다. 이번 세대의 추가는 세 가지<a class="fn" href="#ref-10">[10]</a><a class="fn" href="#ref-16">[16]</a>:
+    </p>
+    <ul>
+      <li><strong>View Annotations API</strong> — 화면 위 뷰를 엔티티에 매핑해, 사용자가 "지금 보고 있는 이것"을 Siri와의 대화로 참조·조작</li>
+      <li><strong>Entity / Intent 스키마</strong> — 앱 콘텐츠를 Spotlight <em>시맨틱 인덱스</em>에 기여. 자연어로 발견되고, §6의 Spotlight 도구(RAG)가 소비하는 것도 이 인덱스</li>
+      <li><strong>AppIntentsTesting</strong> — Siri·단축어·Spotlight 실경로를 UI 자동화 없이 검증하는 전용 테스트 프레임워크</li>
+    </ul>
+    <h3>Image Playground API</h3>
+    <p>
+      PCC의 전용 이미지 모델(ADM 3)로 재구축됐습니다 — 사실적 스타일을 포함한 고품질 생성,
+      사진 또는 설명에서 시작, 자연어 반복 수정, 가로/세로 비율 지원. 시스템 시트를 띄우는 것만으로
+      서버급 이미지 생성이 앱에 들어옵니다<a class="fn" href="#ref-17">[17]</a>.
+    </p>
+    <h3>Visual Intelligence · Core Spotlight</h3>
+    <p>
+      앱 콘텐츠를 Visual Intelligence 검색 결과에 노출하는 모범사례가 정리됐고(엔티티 정의, 열기/재생 다이렉트 액션)<a class="fn" href="#ref-18">[18]</a>,
+      Core Spotlight는 LLM 검색과 결합돼 앱 데이터의 자연어 발견 경로가 넓어졌습니다<a class="fn" href="#ref-19">[19]</a>.
+    </p>
+    <h3>음성 — 시스템 레벨 강화</h3>
+    <p>
+      표현력 있는 음성 합성이 MOS 4.15(기존 3.87)에 도달했고, 받아쓰기의 구두점·대소문자·의미 캡처가
+      개선됐습니다. 개발자 관점에서는 SpeechAnalyzer(26 도입) 위에 올라간 모델 품질 향상이라
+      기존 코드가 그대로 좋아지는 종류의 변화입니다<a class="fn" href="#ref-1">[1]</a>.
+    </p>
+  </div>
+</article>
+
+<!-- ═══════════════ §11 체크리스트 ═══════════════ -->
+<article id="ch-checklist" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§11</span>
+    <h2>개발자 체크리스트와 샘플 앱</h2>
+    <p>정식 릴리스(2026. 9)까지 두 달, 지금 할 일</p>
+  </div>
+  <div class="prose reveal">
+    <ol class="checklist">
+      <li><strong>Xcode 27 베타 설치</strong> — 27 SDK 없이는 아래 어떤 API도 컴파일되지 않는다</li>
+      <li><strong>기존 26 Foundation Models 코드 재실행</strong> — 리빌드된 모델로 품질이 공짜로 오른다. 가드레일 오탐 감소 확인</li>
+      <li><strong>PCC 무료 티어 검토</strong> — 첫 다운로드 200만 미만이라면 서버 모델이 비용 0. 온디바이스로 부족했던 기능 재설계</li>
+      <li><strong>이미지 입력 기능 발굴</strong> — 사진·스크린샷·문서를 받는 앱이라면 §5가 바로 기능이 된다</li>
+      <li><strong>에이전틱 단계 분리</strong> — 세션 하나에 도구를 몰아넣고 있다면 Dynamic Profiles로 단계별 재구성</li>
+      <li><strong>Evaluations 도입</strong> — 프롬프트 수정을 감이 아니라 점수로 관리</li>
+      <li><strong>App Intents 스키마 채택</strong> — 새 Siri·Spotlight 시맨틱 인덱스·로컬 RAG가 전부 이 위에서 돈다</li>
+    </ol>
+    <h3>같이 보기 — 실행 가능한 샘플 앱</h3>
+    <p>
+      이 리포트와 짝을 이루는 멀티플랫폼(iOS·macOS·visionOS 27) 샘플 앱
+      <a href="https://github.com/jsonpassion" target="_blank" rel="noopener">AppleIntelligence27</a>에서
+      아래 여섯 샘플을 직접 실행할 수 있습니다.
+    </p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>샘플</th><th>데모하는 API</th><th>근거 세션</th></tr></thead>
+        <tbody>
+          <tr><td>01</td><td>기본 채팅 세션</td><td><code>SystemLanguageModel</code> · <code>streamResponse</code> · <code>contextSize</code> · <code>tokenCount</code></td><td>241</td></tr>
+          <tr><td>02</td><td>이미지 이해</td><td>멀티모달 <code>Attachment</code></td><td>241</td></tr>
+          <tr><td>03</td><td>PCC + 추론 레벨</td><td><code>PrivateCloudComputeLanguageModel</code> · <code>reasoningLevel</code> · <code>usage</code></td><td>241 · 319</td></tr>
+          <tr><td>04</td><td>Guided Generation</td><td><code>@Generable</code> · <code>@Guide</code></td><td>(26 도입)</td></tr>
+          <tr><td>05</td><td>시스템 도구</td><td><code>OCRTool</code> · <code>BarcodeReaderTool</code></td><td>241</td></tr>
+          <tr><td>06</td><td>Dynamic Profiles</td><td><code>DynamicProfile</code> · <code>.model()</code> · <code>.reasoningLevel()</code></td><td>241 · 242</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</article>
+
+<!-- ═══════════════ 제작 노트 ═══════════════ -->
+<section id="method" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">NOTE</span>
+    <h2>제작 노트</h2>
+  </div>
+  <div class="prose reveal">
+    <p>
+      이 문서는 Apple ML Research 테크 리포트, WWDC26 세션 18개, Apple Newsroom 발표문, 개발자 커뮤니티의
+      1차 분석을 교차 확인해 작성한 <strong>비공식 개인 정리</strong>입니다. 본문 위첨자 번호는 아래
+      참고 자료로 연결됩니다. 모든 일러스트 애니메이션은 외부 에셋 없이 자체 제작한 Lottie입니다.
+      OS 27 베타 기준이므로 정식 릴리스 전 세부 사항이 바뀔 수 있으며, 오류 제보는 리포 이슈로 받습니다.
+    </p>
+  </div>
+</section>
+
+<!-- ═══════════════ 참고 자료 ═══════════════ -->
+<section id="references" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">REFERENCES</span>
+    <h2>참고 자료</h2>
+  </div>
+  <ol class="refs reveal">
+    <li id="ref-1"><a href="https://machinelearning.apple.com/research/introducing-third-generation-of-apple-foundation-models" target="_blank" rel="noopener">Introducing the Third Generation of Apple Foundation Models</a> — Apple ML Research, 2026. 6. 8</li>
+    <li id="ref-2"><a href="https://developer.apple.com/videos/play/wwdc2026/241/" target="_blank" rel="noopener">What's new in the Foundation Models framework</a> — WWDC26 세션 241</li>
+    <li id="ref-3"><a href="https://developer.apple.com/videos/play/wwdc2026/242/" target="_blank" rel="noopener">Build agentic app experiences with the Foundation Models framework</a> — WWDC26 세션 242</li>
+    <li id="ref-4"><a href="https://developer.apple.com/videos/play/wwdc2026/319/" target="_blank" rel="noopener">Build with the new Apple Foundation Model on Private Cloud Compute</a> — WWDC26 세션 319</li>
+    <li id="ref-5"><a href="https://developer.apple.com/videos/play/wwdc2026/339/" target="_blank" rel="noopener">Bring an LLM provider to the Foundation Models framework</a> — WWDC26 세션 339</li>
+    <li id="ref-6"><a href="https://developer.apple.com/videos/play/wwdc2026/334/" target="_blank" rel="noopener">Build AI-powered scripts with the fm CLI and Python SDK</a> — WWDC26 세션 334</li>
+    <li id="ref-7"><a href="https://developer.apple.com/videos/play/wwdc2026/298/" target="_blank" rel="noopener">Meet the Evaluations framework</a> (298) · <a href="https://developer.apple.com/videos/play/wwdc2026/299/" target="_blank" rel="noopener">Create robust evaluations for agentic apps</a> (299) · <a href="https://developer.apple.com/videos/play/wwdc2026/335/" target="_blank" rel="noopener">Improve your prompts by hill-climbing with Evaluations</a> (335)</li>
+    <li id="ref-8"><a href="https://www.apple.com/newsroom/2026/06/apple-aids-app-development-with-new-intelligence-frameworks-and-advanced-tools/" target="_blank" rel="noopener">Apple aids app development with new intelligence frameworks and advanced tools</a> — Apple Newsroom, 2026. 6. 8</li>
+    <li id="ref-9"><a href="https://www.apple.com/newsroom/2026/06/apple-unveils-next-generation-of-apple-intelligence-siri-ai-and-more/" target="_blank" rel="noopener">Apple unveils next generation of Apple Intelligence, Siri AI, and more</a> — Apple Newsroom, 2026. 6. 8</li>
+    <li id="ref-10"><a href="https://www.macrumors.com/2026/06/09/apple-outlines-major-ai-and-developer-tool-updates/" target="_blank" rel="noopener">Apple Outlines Major AI and Developer Tool Updates at 2026 Platforms State of the Union</a> — MacRumors, 2026. 6. 9</li>
+    <li id="ref-11"><a href="https://dev.to/arshtechpro/wwdc-2026-apple-just-opened-the-foundation-models-framework-to-any-llm-provider-5ejn" target="_blank" rel="noopener">WWDC 2026 — Apple Just Opened the Foundation Models Framework to Any LLM Provider</a> — arshtechpro, DEV Community</li>
+    <li id="ref-12"><a href="https://techcrunch.com/2026/06/09/wwdc-2026-everything-announced-on-siri-ai-os-27-apple-intelligence-and-more/" target="_blank" rel="noopener">WWDC 2026: Everything announced on Siri AI, iOS 27, Apple Intelligence, and more</a> — TechCrunch, 2026. 6. 9</li>
+    <li id="ref-13"><a href="https://developer.apple.com/documentation/foundationmodels" target="_blank" rel="noopener">Foundation Models</a> — Apple Developer Documentation</li>
+    <li id="ref-14"><a href="https://developer.apple.com/wwdc26/guides/apple-intelligence/" target="_blank" rel="noopener">WWDC26 Apple Intelligence guide</a> — Apple Developer</li>
+    <li id="ref-15"><a href="https://developer.apple.com/videos/play/wwdc2026/243/" target="_blank" rel="noopener">Debug and profile agentic app experiences with Instruments</a> — WWDC26 세션 243</li>
+    <li id="ref-16"><a href="https://developer.apple.com/videos/play/wwdc2026/240/" target="_blank" rel="noopener">Build intelligent Siri experiences with App Schemas</a> (240) · <a href="https://developer.apple.com/videos/play/wwdc2026/295/" target="_blank" rel="noopener">Validate your App Intents adoption</a> (295) · <a href="https://developer.apple.com/videos/play/wwdc2026/343/" target="_blank" rel="noopener">Explore advanced App Intents features</a> (343) · <a href="https://developer.apple.com/videos/play/wwdc2026/344/" target="_blank" rel="noopener">Code-along: Make your app available to Siri</a> (344) · <a href="https://developer.apple.com/videos/play/wwdc2026/345/" target="_blank" rel="noopener">Discover new capabilities in App Intents</a> (345)</li>
+    <li id="ref-17"><a href="https://developer.apple.com/videos/play/wwdc2026/375/" target="_blank" rel="noopener">Create high-quality images using Image Playground</a> — WWDC26 세션 375</li>
+    <li id="ref-18"><a href="https://developer.apple.com/videos/play/wwdc2026/297/" target="_blank" rel="noopener">Best practices for integrating visual intelligence in your app</a> — WWDC26 세션 297</li>
+    <li id="ref-19"><a href="https://developer.apple.com/videos/play/wwdc2026/246/" target="_blank" rel="noopener">LLM search using Core Spotlight</a> — WWDC26 세션 246</li>
+  </ol>
+</section>
+
+</main>
+
+<footer class="footer">
+  <p>AppleIntelligence27 — WWDC26 · 3세대 Apple Foundation Models 비공식 기술 리포트 · 2026. 7 작성 (OS 27 베타 기준)</p>
+  <p>Apple, Apple Intelligence, Siri는 Apple Inc.의 상표입니다. 이 사이트의 애니메이션은 전부 자체 제작 Lottie입니다.</p>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bodymovin/5.12.2/lottie.min.js" defer></script>
+<script src="script.js" defer></script>
+</body>
+</html>
