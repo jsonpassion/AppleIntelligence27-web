@@ -49,8 +49,8 @@
     <figcaption>그림 1 — 하나의 세션, 다섯 갈래의 백엔드: 온디바이스 · PCC · Claude · Gemini · MLX가 같은 API로 수렴한다</figcaption>
   </figure>
   <div class="hero-meta">
-    <span class="chip"><strong>11</strong>개 챕터</span>
-    <span class="chip"><strong>19</strong>개 참고 자료</span>
+    <span class="chip"><strong>12</strong>개 챕터</span>
+    <span class="chip"><strong>22</strong>개 참고 자료</span>
     <span class="chip"><strong>18</strong>개 WWDC26 세션 링크</span>
     <span class="chip chip-soft">비공식 개인 정리</span>
   </div>
@@ -66,8 +66,8 @@
     <p>발표에서 인용된 수치 중 이번 세대의 방향을 실제로 보여주는 것만 골랐습니다.</p>
   </div>
   <div class="stats-grid">
-    <div class="stat-card reveal"><div class="num">45.6<small>%</small></div>
-      <div class="label">AFM 3 Core(온디바이스 3B)가 텍스트 태스크에서 2025년 모델 대비 받은 <strong>선호도 우위</strong></div>
+    <div class="stat-card reveal"><div class="num">45.6 <small>: 23.3</small></div>
+      <div class="label">AFM 3 Core(온디바이스 3B)와 2025년 모델의 텍스트 태스크 <strong>맞대결 선호도</strong></div>
       <span class="src">Apple ML Research<a class="fn" href="#ref-1">[1]</a></span></div>
     <div class="stat-card reveal"><div class="num">20B <small>→ 1–4B</small></div>
       <div class="label">AFM 3 Core Advanced의 전체 파라미터와 요청당 <strong>실제 활성</strong> 파라미터 — sparse activation</div>
@@ -81,11 +81,11 @@
     <div class="stat-card reveal"><div class="num">200<small>만</small></div>
       <div class="label">첫 다운로드 기준 — 이 미만이면 <strong>PCC 서버 모델이 무료</strong> (스몰 비즈니스 프로그램)</div>
       <span class="src">WWDC26 · 241 · Newsroom<a class="fn" href="#ref-2">[2]</a><a class="fn" href="#ref-8">[8]</a></span></div>
-    <div class="stat-card reveal"><div class="num">+37.8<small>%</small></div>
-      <div class="label">이미지 이해 태스크에서의 <strong>인간 선호도 개선</strong> — 온디바이스 멀티모달의 근거</div>
+    <div class="stat-card reveal"><div class="num">37.8 <small>: 9.6</small></div>
+      <div class="label">이미지 이해 태스크의 <strong>인간 선호도 맞대결</strong> — 온디바이스 멀티모달의 근거</div>
       <span class="src">Apple ML Research<a class="fn" href="#ref-1">[1]</a></span></div>
     <div class="stat-card reveal"><div class="num">4.15<small> MOS</small></div>
-      <div class="label">표현력 TTS의 평균 의견 점수 — 기존 3.87에서 <strong>자연스러움 대폭 향상</strong></div>
+      <div class="label">AFM 3 Core Advanced 표현력 TTS 평균 의견 점수 — 프로덕션 베이스라인 3.87 대비 <strong>+0.28</strong></div>
       <span class="src">Apple ML Research<a class="fn" href="#ref-1">[1]</a></span></div>
     <div class="stat-card reveal"><div class="num">14<small>%</small></div>
       <div class="label">AFM 3 Cloud Pro의 <strong>수학·복잡 추론 개선폭</strong> (AFM 3 Cloud 대비)</div>
@@ -106,6 +106,7 @@
     <li><a href="#ch-pcc">Private Cloud Compute 개발자 개방 <em>신규</em></a></li>
     <li><a href="#ch-vision">Vision — 온디바이스 멀티모달 입력 <em>신규</em></a></li>
     <li><a href="#ch-agentic">에이전틱 — Dynamic Profiles와 시스템 도구 <em>신규</em></a></li>
+    <li><a href="#ch-context">컨텍스트 엔지니어링과 오케스트레이션 <em>신규</em></a></li>
     <li><a href="#ch-coreai">Core AI 프레임워크 <em>신규</em></a></li>
     <li><a href="#ch-eval">Evaluations 프레임워크 <em>신규</em></a></li>
     <li><a href="#ch-tooling">도구와 생태계 — fm CLI · Python SDK · Xcode 27 · 오픈소스</a></li>
@@ -172,11 +173,18 @@
     <h3>Instruction-Following Pruning — 20B를 폰에 넣는 방법</h3>
     <p>
       AFM 3 Core Advanced의 핵심은 <strong>전체 가중치를 RAM에 올리지 않는다</strong>는 점입니다.
-      모델 전체는 플래시 스토리지에 두고, 프롬프트가 들어오면 <em>라우팅 결정</em>을 먼저 내려
-      해당 요청에 필요한 <strong>routed expert</strong>만 선택적으로 로드합니다. 항상 활성 상태인
-      <strong>shared expert</strong>가 일관성을 담보하고, 요청당 실제 연산은 1–4B 파라미터 수준으로 유지됩니다<a class="fn" href="#ref-1">[1]</a>.
-      결과적으로 "20B급 품질, 3B급 메모리 발자국"이 온디바이스에서 성립합니다.
+      모델 전체는 NAND 플래시에 저장해 두고, 프롬프트 초기 처리 단계에서 <strong>경량 dense 블록</strong>이
+      그 요청에 쓸 expert 집합을 먼저 선택합니다. 선택된 <strong>routed expert</strong>만 필요할 때
+      DRAM으로 스왑되고, 항상 활성 상태인 <strong>shared expert</strong>가 일관성을 담보합니다 —
+      요청당 실제 활성 연산은 1–4B 파라미터 수준입니다<a class="fn" href="#ref-1">[1]</a>.
+      결과적으로 "20B급 품질, 소형 모델급 메모리 발자국"이 온디바이스에서 성립합니다.
     </p>
+    <div class="callout">
+      <strong>커스텀 어댑터 사용자 주의</strong> — 기존 어댑터 훈련 토크릿은 <strong>26.0.0이 마지막 릴리스</strong>이며
+      OS 27 이상과 호환되지 않습니다<a class="fn" href="#ref-20">[20]</a>. 3세대 모델에는 26용 <code>.fmadapter</code>가
+      이월되지 않으므로, 스타일·도메인 특화가 필요하다면 Skill API(§7)·컨텍스트 엔지니어링, 또는
+      Core AI(§8)로 자체 모델을 배포하는 경로를 검토해야 합니다.
+    </div>
     <h3>서버 쪽 — Parallel-Track MoE</h3>
     <p>
       AFM 3 Cloud는 2세대에서 도입된 Parallel-Track Mixture-of-Experts를 개선해
@@ -415,19 +423,131 @@
   </div>
 </article>
 
-<!-- ═══════════════ §7 Core AI ═══════════════ -->
-<article id="ch-coreai" class="section chapter">
+<!-- ═══════════════ §7 컨텍스트 엔지니어링 ═══════════════ -->
+<article id="ch-context" class="section chapter">
   <div class="sec-head reveal">
     <span class="sec-tag">§7 · 신규</span>
+    <h2>컨텍스트 엔지니어링과 오케스트레이션</h2>
+    <p>세션 242 딥다이브 — 트랜스크립트 관리 · 멀티 에이전트 패턴 · 도구 루프 제어<a class="fn" href="#ref-3">[3]</a></p>
+  </div>
+  <div class="prose reveal">
+    <p>
+      Dynamic Profiles(§6)가 골격이라면, 세션 242가 공개한 API들은 그 위에서 <strong>컨텍스트를 다루는 근육</strong>입니다.
+      LLM 앱의 실전 난제 — 길어지는 대화, 낭비되는 토큰, 통제 안 되는 도구 루프, 에이전트 간 협업 — 를
+      프레임워크 차원에서 푸는 도구가 전부 이번 세대에 들어왔습니다<a class="fn" href="#ref-3">[3]</a>.
+    </p>
+
+    <h3>DynamicInstructions — 지시문·도구의 컴포저블 단위</h3>
+    <p>
+      지시문과 도구를 SwiftUI 뷰처럼 <strong>합성 가능한 컴포넌트</strong>로 묶습니다.
+      중첩하면 지시문과 도구가 자동으로 이어 붙습니다 — 조건부로 전문 지식을 끼워 넣는 것도 <code>if</code>문 하나입니다<a class="fn" href="#ref-3">[3]</a>.
+    </p>
+    <pre><code><span class="k">struct</span> <span class="t">BrainstormFacilitator</span>: <span class="t">DynamicInstructions</span> {
+    <span class="k">var</span> orchestrator: <span class="t">CraftOrchestrator</span>
+    <span class="k">var</span> body: <span class="k">some</span> <span class="t">DynamicInstructions</span> {
+        <span class="t">Instructions</span> { <span class="s">"따뜻하고 친절한 공예 브레인스토밍 진행자."</span> }
+        <span class="t">GenerateProjectTitle</span>()
+        <span class="k">if</span> orchestrator.techniques.contains(.origami) {
+            <span class="t">OrigamiExpert</span>()   <span class="c">// 조건부 전문 지식 주입</span>
+        }
+    }
+}</code></pre>
+
+    <h3>트랜스크립트 관리 — 세 개의 층</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>층</th><th>API</th><th>성격</th><th>용도</th></tr></thead>
+        <tbody>
+          <tr><td>무상태 변환</td><td><code>.historyTransform { }</code></td><td>요청 직전, 비파괴</td><td>완료된 도구 호출 걸러내기, 프로필별 컨텍스트 축소</td></tr>
+          <tr><td>재사용 수정자</td><td><code>DynamicProfileModifier</code></td><td>변환 로직의 패키징</td><td>Utilities 패키지의 <code>.rollingWindow(size:)</code> · <code>.droppingCompletedToolCalls()</code></td></tr>
+          <tr><td>수명주기 훅</td><td><code>.onResponse { }</code> · <code>.onToolCall { }</code> + <code>@SessionProperty</code></td><td>상태 있는 변이</td><td>오래된 이력을 요약으로 <strong>압축(compaction)</strong></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <pre><code><span class="c">// 압축 패턴 — 이력이 50개를 넘으면 앞부분을 요약으로 대체</span>
+<span class="k">struct</span> <span class="t">CraftProfile</span>: <span class="t">LanguageModelSession.DynamicProfile</span> {
+    <span class="k">@SessionProperty</span>(\.history) <span class="k">var</span> history
+    <span class="k">@SessionProperty</span>(\.summary) <span class="k">var</span> summary   <span class="c">// 커스텀 프로퍼티</span>
+
+    <span class="k">var</span> body: <span class="k">some</span> <span class="t">DynamicProfile</span> {
+        <span class="t">Profile</span> {
+            <span class="t">TutorialAuthor</span>(orchestrator: orchestrator)
+            <span class="k">if let</span> summary { <span class="t">Instructions</span> { <span class="s">"요약: </span>\(summary)<span class="s">"</span> } }
+        }
+        .<span class="nf">onResponse</span> {
+            <span class="k">if</span> history.count &gt; 50, <span class="k">let</span> i = <span class="nf">lastResponse</span>(history.prefix(40)) {
+                summary = <span class="k">try await</span> <span class="nf">summarize</span>(history[0..&lt;i])
+                history = history[i...]
+            }
+        }
+    }
+}</code></pre>
+
+    <h3>멀티 에이전트 오케스트레이션 — 세 가지 정식 패턴</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>패턴</th><th>트랜스크립트</th><th>최종 답변</th><th>쓰임새</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Baton-pass</strong></td><td>공유</td><td>바통을 받은 쪽</td><td>순차 협업 — 도구 호출로 모드 전환, <code>.onToolCall</code>로 감지</td></tr>
+          <tr><td><strong>Phone-a-friend</strong></td><td>격리 (자식 세션)</td><td>부모</td><td>위임 상담 — Tool 안에서 별도 프로필의 자식 세션 생성</td></tr>
+          <tr><td><strong>Skills</strong></td><td>공유</td><td>주 에이전트</td><td>절차적 지식을 필요할 때만 컨텍스트에 로드</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <pre><code><span class="c">// Skill — 마크다운 파일이 아니라 앱 안에서 합성하는 Swift 타입</span>
+<span class="t">Skills</span>(activations: activations) {
+    <span class="t">Skill</span>(
+        name: <span class="s">"origami_folds"</span>,
+        description: <span class="s">"종이접기 접기 기법의 상세 지식"</span>,
+        prompt: <span class="s">"""
+            Valley Fold: 종이를 몸 쪽으로 접어 V자 골을 만든다
+            Mountain Fold: 종이를 바깥쪽으로 접어 역V자 산을 만든다
+            """</span>
+    )
+}</code></pre>
+
+    <h3>도구 루프 제어 — ToolCallingMode</h3>
+    <p>
+      에이전트 루프의 고삐입니다. <code>.allowed</code>(기본) · <code>.disallowed</code>(도구 금지) ·
+      <code>.required</code>(반드시 도구 호출) 세 모드를 프로필 수정자나 <code>GenerationOptions</code>로 지정합니다.
+      <code>.required</code>를 쓸 때는 <strong>탈출 조건이 필수</strong> — 상태에 따라 모드를 바꾸거나,
+      <code>CancellationError</code>를 던지는 최종-답변 도구를 두는 패턴이 공식 권장입니다<a class="fn" href="#ref-3">[3]</a>.
+    </p>
+    <pre><code><span class="t">Profile</span> {
+    <span class="t">Instructions</span>(<span class="s">"종이접기 질문에 답한다"</span>)
+    <span class="t">QueryOrigamiDatabaseTool</span>()
+}
+.<span class="nf">toolCallingMode</span>(state.queriedDatabase ? .disallowed : .required)
+.<span class="nf">onToolCall</span> { state.queriedDatabase = <span class="k">true</span> }</code></pre>
+
+    <h3>트랜스크립트 오류 정책과 직접 편집</h3>
+    <p>
+      오류·취소 시 기본 동작은 응답 전 상태로 <strong>되돌리기</strong>(<code>.revertTranscript</code>)지만,
+      <code>.preserveTranscript</code>로 바꿔 수동 복구할 수 있습니다. <code>session.transcript</code>가
+      이제 <strong>설정 가능</strong>해서 직접 편집도 됩니다 — 단, <code>isResponding == false</code>일 때만<a class="fn" href="#ref-3">[3]</a>.
+    </p>
+    <div class="callout callout-info">
+      <strong>KV 캐시와 성능</strong> — 트랜스크립트에 <em>추가</em>하는 건 캐시를 보존하지만(지연 최소),
+      항목 <em>삭제</em>·도구 변경·지시문 변경은 캐시를 무효화해 지연이 늘어납니다. 모델마다 캐싱 동작이 다르므로
+      Xcode의 Foundation Models Instrument로 측정하는 것이 공식 가이드입니다<a class="fn" href="#ref-3">[3]</a><a class="fn" href="#ref-15">[15]</a>.
+    </div>
+  </div>
+</article>
+
+<!-- ═══════════════ §8 Core AI ═══════════════ -->
+<article id="ch-coreai" class="section chapter">
+  <div class="sec-head reveal">
+    <span class="sec-tag">§8 · 신규</span>
     <h2>Core AI 프레임워크</h2>
     <p>커스텀 LLM을 Apple silicon에 배포하는 정식 경로<a class="fn" href="#ref-8">[8]</a><a class="fn" href="#ref-10">[10]</a></p>
   </div>
   <div class="prose reveal">
     <p>
       Core ML이 "일반 ML 모델의 배포 포맷"이었다면, Core AI는 <strong>풀사이즈 LLM의 온디바이스 구동</strong>을
-      위해 처음부터 설계된 새 프레임워크입니다. Apple silicon의 유니파이드 메모리와 Neural Engine에 최적화되었고,
-      ahead-of-time 컴파일, 전용 Instruments, PyTorch → Apple silicon 변환 Python 도구를 제공합니다.
-      새 Siri의 기반 기술이기도 합니다<a class="fn" href="#ref-8">[8]</a><a class="fn" href="#ref-10">[10]</a>.
+      위해 처음부터 설계된 새 OS 레벨 프레임워크입니다. Apple silicon의 유니파이드 메모리와 Neural Engine에 최적화되었고,
+      메모리 안전한 모던 Swift API, 하드웨어 자동 특화, ahead-of-time 컴파일, <strong>추론 메모리의 세밀한 제어</strong>,
+      전용 Instruments, PyTorch → Apple silicon 변환 Python 도구를 제공합니다. 소형 비전 모델부터 대규모 생성형 AI까지
+      커버하며, 새 Siri의 기반 기술이기도 합니다<a class="fn" href="#ref-8">[8]</a><a class="fn" href="#ref-10">[10]</a><a class="fn" href="#ref-22">[22]</a>.
     </p>
     <p>
       Foundation Models와의 관계가 핵심입니다: Core AI로 패키징한 모델은 <code>CoreAILanguageModel</code>로
@@ -441,7 +561,7 @@
 <!-- ═══════════════ §8 Evaluations ═══════════════ -->
 <article id="ch-eval" class="section chapter">
   <div class="sec-head reveal">
-    <span class="sec-tag">§8 · 신규</span>
+    <span class="sec-tag">§9 · 신규</span>
     <h2>Evaluations 프레임워크</h2>
     <p>AI 기능의 품질을 단위 테스트 너머에서 측정한다<a class="fn" href="#ref-7">[7]</a></p>
   </div>
@@ -466,7 +586,7 @@
 <!-- ═══════════════ §9 도구·생태계 ═══════════════ -->
 <article id="ch-tooling" class="section chapter">
   <div class="sec-head reveal">
-    <span class="sec-tag">§9</span>
+    <span class="sec-tag">§10</span>
     <h2>도구와 생태계</h2>
     <p>fm CLI · Python SDK · Xcode 27 · 오픈소스<a class="fn" href="#ref-6">[6]</a><a class="fn" href="#ref-8">[8]</a><a class="fn" href="#ref-10">[10]</a></p>
   </div>
@@ -506,7 +626,7 @@ response = <span class="k">await</span> session.respond(prompt=<span class="s">"
 <!-- ═══════════════ §10 시스템 통합 강화 ═══════════════ -->
 <article id="ch-system" class="section chapter">
   <div class="sec-head reveal">
-    <span class="sec-tag">§10 · 강화</span>
+    <span class="sec-tag">§11 · 강화</span>
     <h2>시스템 통합 — Siri · App Intents · 이미지 · 음성</h2>
     <p>앱을 OS 인텔리전스에 노출하는 통로들<a class="fn" href="#ref-9">[9]</a><a class="fn" href="#ref-14">[14]</a></p>
   </div>
@@ -523,9 +643,14 @@ response = <span class="k">await</span> session.respond(prompt=<span class="s">"
     <h3>Image Playground API</h3>
     <p>
       PCC의 전용 이미지 모델(ADM 3)로 재구축됐습니다 — 사실적 스타일을 포함한 고품질 생성,
-      사진 또는 설명에서 시작, 자연어 반복 수정, 가로/세로 비율 지원. 시스템 시트를 띄우는 것만으로
-      서버급 이미지 생성이 앱에 들어옵니다<a class="fn" href="#ref-17">[17]</a>.
+      사진 또는 설명에서 시작, 자연어 반복 수정, 치수(가로/세로) 지정 지원. ImagePlayground 프레임워크가
+      시스템과 동일한 모델·스타일·품질을 앱 안으로 가져옵니다<a class="fn" href="#ref-17">[17]</a>.
     </p>
+    <div class="callout">
+      <strong>마이그레이션 주의</strong> — 코드에서 직접 이미지를 만들던 비-UI API <code>ImageCreator</code>는
+      OS 27에서 <strong>폐기(deprecated)</strong>됐습니다. 새 API로 옮기면 더 높은 품질과 내장 프라이버시를
+      얻습니다<a class="fn" href="#ref-17">[17]</a><a class="fn" href="#ref-21">[21]</a>.
+    </div>
     <h3>Visual Intelligence · Core Spotlight</h3>
     <p>
       앱 콘텐츠를 Visual Intelligence 검색 결과에 노출하는 모범사례가 정리됐고(엔티티 정의, 열기/재생 다이렉트 액션)<a class="fn" href="#ref-18">[18]</a>,
@@ -533,9 +658,11 @@ response = <span class="k">await</span> session.respond(prompt=<span class="s">"
     </p>
     <h3>음성 — 시스템 레벨 강화</h3>
     <p>
-      표현력 있는 음성 합성이 MOS 4.15(기존 3.87)에 도달했고, 받아쓰기의 구두점·대소문자·의미 캡처가
+      표현력 있는 음성 합성이 MOS 4.15(베이스라인 3.87)에 도달했고, 받아쓰기의 구두점·대소문자·의미 캡처가
       개선됐습니다. 개발자 관점에서는 SpeechAnalyzer(26 도입) 위에 올라간 모델 품질 향상이라
       기존 코드가 그대로 좋아지는 종류의 변화입니다<a class="fn" href="#ref-1">[1]</a>.
+      베타 기준 보도로는 표현력 Siri 음성·고급 받아쓰기 같은 상위 기능이 <strong>RAM 12GB 이상 기기</strong>를
+      요구합니다 — 음성 의존 기능을 설계한다면 기기별 가용성 차이를 감안해야 합니다.
     </p>
   </div>
 </article>
@@ -543,7 +670,7 @@ response = <span class="k">await</span> session.respond(prompt=<span class="s">"
 <!-- ═══════════════ §11 체크리스트 ═══════════════ -->
 <article id="ch-checklist" class="section chapter">
   <div class="sec-head reveal">
-    <span class="sec-tag">§11</span>
+    <span class="sec-tag">§12</span>
     <h2>개발자 체크리스트와 샘플 앱</h2>
     <p>정식 릴리스(2026. 9)까지 두 달, 지금 할 일</p>
   </div>
@@ -554,8 +681,11 @@ response = <span class="k">await</span> session.respond(prompt=<span class="s">"
       <li><strong>PCC 무료 티어 검토</strong> — 첫 다운로드 200만 미만이라면 서버 모델이 비용 0. 온디바이스로 부족했던 기능 재설계</li>
       <li><strong>이미지 입력 기능 발굴</strong> — 사진·스크린샷·문서를 받는 앱이라면 §5가 바로 기능이 된다</li>
       <li><strong>에이전틱 단계 분리</strong> — 세션 하나에 도구를 몰아넣고 있다면 Dynamic Profiles로 단계별 재구성</li>
+      <li><strong>컨텍스트 예산 설계</strong> — historyTransform·압축 패턴으로 토큰 낭비 제거, KV 캐시 무효화를 Instruments로 측정</li>
+      <li><strong>커스텀 어댑터 마이그레이션</strong> — 26용 <code>.fmadapter</code>는 27 비호환. Skill API·컨텍스트 엔지니어링·Core AI로 대체 경로 결정</li>
       <li><strong>Evaluations 도입</strong> — 프롬프트 수정을 감이 아니라 점수로 관리</li>
       <li><strong>App Intents 스키마 채택</strong> — 새 Siri·Spotlight 시맨틱 인덱스·로컬 RAG가 전부 이 위에서 돈다</li>
+      <li><strong>ImageCreator 사용 앱 점검</strong> — 폐기됨. 새 Image Playground API로 이전</li>
     </ol>
     <h3>같이 보기 — 실행 가능한 샘플 앱</h3>
     <p>
@@ -572,7 +702,8 @@ response = <span class="k">await</span> session.respond(prompt=<span class="s">"
           <tr><td>03</td><td>PCC + 추론 레벨</td><td><code>PrivateCloudComputeLanguageModel</code> · <code>reasoningLevel</code> · <code>usage</code></td><td>241 · 319</td></tr>
           <tr><td>04</td><td>Guided Generation</td><td><code>@Generable</code> · <code>@Guide</code></td><td>(26 도입)</td></tr>
           <tr><td>05</td><td>시스템 도구</td><td><code>OCRTool</code> · <code>BarcodeReaderTool</code></td><td>241</td></tr>
-          <tr><td>06</td><td>Dynamic Profiles</td><td><code>DynamicProfile</code> · <code>.model()</code> · <code>.reasoningLevel()</code></td><td>241 · 242</td></tr>
+          <tr><td>06</td><td>Dynamic Profiles</td><td><code>DynamicProfile</code> · <code>.model()</code> · <code>.reasoningLevel()</code> · <code>.onToolCall</code> · <code>ToolCallingMode</code></td><td>241 · 242</td></tr>
+          <tr><td>07</td><td>컨텍스트 관리</td><td><code>.historyTransform</code> · <code>@SessionProperty</code> · <code>transcriptErrorHandlingPolicy</code></td><td>242</td></tr>
         </tbody>
       </table>
     </div>
@@ -621,6 +752,9 @@ response = <span class="k">await</span> session.respond(prompt=<span class="s">"
     <li id="ref-17"><a href="https://developer.apple.com/videos/play/wwdc2026/375/" target="_blank" rel="noopener">Create high-quality images using Image Playground</a> — WWDC26 세션 375</li>
     <li id="ref-18"><a href="https://developer.apple.com/videos/play/wwdc2026/297/" target="_blank" rel="noopener">Best practices for integrating visual intelligence in your app</a> — WWDC26 세션 297</li>
     <li id="ref-19"><a href="https://developer.apple.com/videos/play/wwdc2026/246/" target="_blank" rel="noopener">LLM search using Core Spotlight</a> — WWDC26 세션 246</li>
+    <li id="ref-20"><a href="https://developer.apple.com/apple-intelligence/foundation-models-adapter/" target="_blank" rel="noopener">Foundation Models adapter training</a> — Apple Developer (26.0.0이 마지막 릴리스, OS 27+ 비호환 명시)</li>
+    <li id="ref-21"><a href="https://developer.apple.com/documentation/ImagePlayground/ImageCreator" target="_blank" rel="noopener">ImageCreator</a> — Apple Developer Documentation (OS 27에서 폐기)</li>
+    <li id="ref-22"><a href="https://developer.apple.com/ios/whats-new/" target="_blank" rel="noopener">What's New — iOS</a> — Apple Developer</li>
   </ol>
 </section>
 
